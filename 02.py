@@ -1,29 +1,38 @@
 from collections import namedtuple
 
-ProgramState = namedtuple('ProgramState', ['pc', 'halted', 'registers'])
+ProgramState = namedtuple('ProgramState', ['pc', 'halted', 'memory'])
 
 
 def main():
-    with open('02.txt') as f:
-        code = f.read()
-    registers = [int(value) for value in code.split(',')]
-    initialized_registers = alarm_1202(registers)
-    initial_state = ProgramState(pc=0, halted=False, registers=initialized_registers)
-    state_stack = run(initial_state,
+    # load program
+    program = load_program('02.txt')
+
+    # part 1
+    print('Part 1:')
+    print(f'{execute_program(program, 12, 2)=}')
+
+    # part 2
+    solutions = [(noun, verb) for noun in range(100) for verb in range(100) if
+                 execute_program(program, noun, verb) == 19690720]
+    for noun, verb in solutions:
+        print('Part 2:')
+        print(f'{noun=}')
+        print(f'{verb=}')
+        print(f'{100 * noun + verb=}')
+
+
+def load_program(program_path: str) -> ProgramState:
+    with open(program_path) as f:
+        program_text = f.read()
+    memory = [int(value) for value in program_text.split(',')]
+    return ProgramState(pc=0, halted=False, memory=memory)
+
+
+def execute_program(program_state: ProgramState, noun: int, verb: int) -> int:
+    state_stack = run(set_input(program_state, noun, verb),
                       lambda current: not current.halted,
                       update)
-
-    print(f'Part 1: {peek(state_stack).registers[0]}')
-    print('state_stack:')
-    print('\n'.join(str(state) for state in state_stack))
-
-
-def alarm_1202(registers):
-    return set_register(set_register(registers, 1, 12), 2, 2)
-
-
-def set_register(registers, position, value):
-    return [*registers[:position], value, *registers[position + 1:]]
+    return peek(state_stack).memory[0]
 
 
 def run(initial, condition, step):
@@ -33,20 +42,16 @@ def run(initial, condition, step):
     return stack
 
 
-def peek(stack):
-    return stack[-1]
-
-
 def update(state):
     def binary_operation(operation):
         def perform(s):
-            r = s.registers
+            m = s.memory
             pc = s.pc
-            a = r[pc + 1]
-            b = r[pc + 2]
-            c = r[pc + 3]
-            r = set_register(r, c, operation(r[a], r[b]))
-            return ProgramState(pc=pc + 4, registers=r, halted=s.halted)
+            a = m[pc + 1]
+            b = m[pc + 2]
+            c = m[pc + 3]
+            m = set_memory(m, c, operation(m[a], m[b]))
+            return ProgramState(pc=pc + 4, memory=m, halted=s.halted)
 
         return perform
 
@@ -57,17 +62,30 @@ def update(state):
         return a * b
 
     def halt(s):
-        return ProgramState(pc=s.pc, registers=s.registers, halted=True)
+        return ProgramState(pc=s.pc, memory=s.memory, halted=True)
 
     if state.halted:
         raise Exception
-    opcode = state.registers[state.pc]
+    opcode = state.memory[state.pc]
     operations = {
-        1: binary_operation(add),
-        2: binary_operation(multiply),
+        1:  binary_operation(add),
+        2:  binary_operation(multiply),
         99: halt,
     }
     return operations[opcode](state)
+
+
+def set_input(program_state, noun, verb):
+    memory = set_memory(set_memory(program_state.memory, 1, noun), 2, verb)
+    return ProgramState(pc=program_state.pc, halted=program_state.halted, memory=memory)
+
+
+def set_memory(memory, position, value):
+    return [*memory[:position], value, *memory[position + 1:]]
+
+
+def peek(stack):
+    return stack[-1]
 
 
 if __name__ == '__main__':
